@@ -113,16 +113,22 @@ along with GCC; see the file COPYING3.  If not see
 typedef struct wstream_df_frame
 {
   tree wstream_df_frame_type;
+
+  tree wstream_df_frame_field_sc;
+  tree wstream_df_frame_field_size;
   tree wstream_df_frame_field_work_fn;
+  tree wstream_df_frame_field_own_barrier;
+  tree wstream_df_frame_field_refcount;
+  tree wstream_df_frame_field_input_view_chain;
+  tree wstream_df_frame_field_output_view_chain;
+
+#if ALLOW_WQEVENT_SAMPLING
   tree wstream_df_frame_field_bytes_prematch_nodes;
   tree wstream_df_frame_field_bytes_cpu_in;
   tree wstream_df_frame_field_bytes_cpu_ts;
   tree wstream_df_frame_field_cache_misses;
   tree wstream_df_frame_field_last_owner;
   tree wstream_df_frame_field_steal_type;
-  tree wstream_df_frame_field_sc;
-  tree wstream_df_frame_field_size;
-  tree wstream_df_frame_field_own_barrier;
   tree wstream_df_frame_field_creation_timestamp;
   tree wstream_df_frame_field_ready_timestamp;
   tree wstream_df_frame_field_bytes_reuse_nodes;
@@ -130,9 +136,8 @@ typedef struct wstream_df_frame
   tree wstream_df_frame_field_dominant_input_data_size;
   tree wstream_df_frame_field_dominant_prematch_data_node_id;
   tree wstream_df_frame_field_dominant_prematch_data_size;
-  tree wstream_df_frame_field_refcount;
-  tree wstream_df_frame_field_input_view_chain;
-  tree wstream_df_frame_field_output_view_chain;
+#endif
+
 } wstream_df_frame;
 
 
@@ -13265,38 +13270,8 @@ build_wstream_df_frame_base_type (omp_context *ctx)
 
      Reversed order to ensure the above order is actually obtained.
   */
-  name = create_tmp_var_name ("output_view_chain");
-  type = ptr_type_node;
-  field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
-  /* insert_field_into_struct (ctx->record_type, field); */
-  DECL_CONTEXT (field) = ctx->record_type;
-  DECL_CHAIN (field) = TYPE_FIELDS (ctx->record_type);
-  TYPE_FIELDS (ctx->record_type) = field;
-  if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
-    TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
-  ctx->base_frame.wstream_df_frame_field_output_view_chain = field;
 
-  name = create_tmp_var_name ("input_view_chain");
-  type = ptr_type_node;
-  field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
-  /* insert_field_into_struct (ctx->record_type, field); */
-  DECL_CONTEXT (field) = ctx->record_type;
-  DECL_CHAIN (field) = TYPE_FIELDS (ctx->record_type);
-  TYPE_FIELDS (ctx->record_type) = field;
-  if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
-    TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
-  ctx->base_frame.wstream_df_frame_field_input_view_chain = field;
-
-  name = create_tmp_var_name ("refcount");
-  type = size_type_node;
-  field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
-  /* insert_field_into_struct (ctx->record_type, field); */
-  DECL_CONTEXT (field) = ctx->record_type;
-  DECL_CHAIN (field) = TYPE_FIELDS (ctx->record_type);
-  TYPE_FIELDS (ctx->record_type) = field;
-  if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
-    TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
-  ctx->base_frame.wstream_df_frame_field_refcount = field;
+#if ALLOW_WQEVENT_SAMPLING
 
   name = create_tmp_var_name ("dominant_prematch_data_size");
   type = size_type_node;
@@ -13343,7 +13318,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
   ctx->base_frame.wstream_df_frame_field_dominant_input_data_node_id = field;
 
   name = create_tmp_var_name ("bytes_reuse_nodes");
-  type = build_array_type_nelts (integer_type_node, MAX_NUMA_NODES);
+  type = ptr_type_node;
   field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
   /*  insert_field_into_struct (ctx->record_type, field); */
   DECL_CONTEXT (field) = ctx->record_type;
@@ -13376,7 +13351,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
   ctx->base_frame.wstream_df_frame_field_creation_timestamp = field;
 
   name = create_tmp_var_name ("cache_misses");
-  type = build_array_type_nelts (long_long_integer_type_node, MAX_CPUS);
+  type = ptr_type_node;
   field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
   /*  insert_field_into_struct (ctx->record_type, field); */
   DECL_CONTEXT (field) = ctx->record_type;
@@ -13387,7 +13362,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
   ctx->base_frame.wstream_df_frame_field_cache_misses = field;
 
   name = create_tmp_var_name ("bytes_cpu_ts");
-  type = build_array_type_nelts (long_long_integer_type_node, MAX_CPUS);
+  type = ptr_type_node;
   field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
   /*  insert_field_into_struct (ctx->record_type, field); */
   DECL_CONTEXT (field) = ctx->record_type;
@@ -13398,7 +13373,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
   ctx->base_frame.wstream_df_frame_field_bytes_cpu_ts = field;
 
   name = create_tmp_var_name ("bytes_cpu_in");
-  type = build_array_type_nelts (integer_type_node, MAX_CPUS);
+  type = ptr_type_node;
   field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
   /*  insert_field_into_struct (ctx->record_type, field); */
   DECL_CONTEXT (field) = ctx->record_type;
@@ -13409,7 +13384,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
   ctx->base_frame.wstream_df_frame_field_bytes_cpu_in = field;
 
   name = create_tmp_var_name ("bytes_prematch_nodes");
-  type = build_array_type_nelts (integer_type_node, MAX_NUMA_NODES);
+  type = ptr_type_node;
   field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
   /*  insert_field_into_struct (ctx->record_type, field); */
   DECL_CONTEXT (field) = ctx->record_type;
@@ -13440,6 +13415,41 @@ build_wstream_df_frame_base_type (omp_context *ctx)
   if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
     TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
   ctx->base_frame.wstream_df_frame_field_steal_type = field;
+
+#endif // ALLOW_WQEVENT_SAMPLING
+  
+  name = create_tmp_var_name ("output_view_chain");
+  type = ptr_type_node;
+  field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
+  /* insert_field_into_struct (ctx->record_type, field); */
+  DECL_CONTEXT (field) = ctx->record_type;
+  DECL_CHAIN (field) = TYPE_FIELDS (ctx->record_type);
+  TYPE_FIELDS (ctx->record_type) = field;
+  if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
+    TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
+  ctx->base_frame.wstream_df_frame_field_output_view_chain = field;
+
+  name = create_tmp_var_name ("input_view_chain");
+  type = ptr_type_node;
+  field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
+  /* insert_field_into_struct (ctx->record_type, field); */
+  DECL_CONTEXT (field) = ctx->record_type;
+  DECL_CHAIN (field) = TYPE_FIELDS (ctx->record_type);
+  TYPE_FIELDS (ctx->record_type) = field;
+  if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
+    TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
+  ctx->base_frame.wstream_df_frame_field_input_view_chain = field;
+  
+  name = create_tmp_var_name ("refcount");
+  type = size_type_node;
+  field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
+  /* insert_field_into_struct (ctx->record_type, field); */
+  DECL_CONTEXT (field) = ctx->record_type;
+  DECL_CHAIN (field) = TYPE_FIELDS (ctx->record_type);
+  TYPE_FIELDS (ctx->record_type) = field;
+  if (TYPE_ALIGN (ctx->record_type) < DECL_ALIGN (field))
+    TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
+  ctx->base_frame.wstream_df_frame_field_refcount = field;
 
   name = create_tmp_var_name ("own_barrier");
   type = ptr_type_node;
