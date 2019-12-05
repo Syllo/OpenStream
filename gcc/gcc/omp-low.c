@@ -122,7 +122,7 @@ typedef struct wstream_df_frame
   tree wstream_df_frame_field_input_view_chain;
   tree wstream_df_frame_field_output_view_chain;
 
-#if ALLOW_WQEVENT_SAMPLING
+#if WQUEUE_PROFILE 
   tree wstream_df_frame_field_bytes_prematch_nodes;
   tree wstream_df_frame_field_bytes_cpu_in;
   tree wstream_df_frame_field_bytes_cpu_ts;
@@ -404,12 +404,14 @@ typedef struct wstream_df_view
   tree wstream_df_view_field_copy_count;
   tree wstream_df_view_field_reuse_count;
   tree wstream_df_view_field_ignore_count;
-  tree wstream_df_view_field_broadcast_table;
 
   bool is_array_view;
-  tree base_offset;
-  tree base_data_offset;
   tree clause;
+
+#ifdef USE_BROADCAST_TABLES
+  tree wstream_df_view_field_broadcast_table;
+#endif
+
 } wstream_df_view;
 
 static struct wstream_df_view *build_wstream_df_view_type (omp_context *, tree);
@@ -5283,10 +5285,12 @@ lower_send_clauses (tree clauses, gimple_seq *ilist, gimple_seq *olist,
 			    unshare_expr (view_ref_prematch), v->wstream_df_view_field_consumer_view, NULL);
 	      gimplify_assign (ref, null_pointer_node, &datafield_list);
 
+#ifdef USE_BROADCAST_TABLES
 	      /* Set broadcast_table_to NULL */
 	      ref = build3 (COMPONENT_REF, TREE_TYPE (v->wstream_df_view_field_broadcast_table),
 			    unshare_expr (view_ref_prematch), v->wstream_df_view_field_broadcast_table, NULL);
 	      gimplify_assign (ref, null_pointer_node, &datafield_list);
+#endif
 
 	      /* Set the reached position to 0 if this is a normal
 		 view, to the size of the array if it's an array of
@@ -13145,11 +13149,13 @@ build_wstream_df_view_type (omp_context *ctx, tree data_type)
   TYPE_NAME (view_t) = name;
 
   /* Add fields.  */
+#ifdef USE_BROADCAST_TABLES
   name = create_tmp_var_name ("broadcast_table");
   type = ptr_type_node;
   field = build_decl (gimple_location (ctx->stmt), FIELD_DECL, name, type);
   insert_field_into_struct (view_t, field);
   ret->wstream_df_view_field_broadcast_table = field;
+#endif
 
   name = create_tmp_var_name ("ignore_count");
   type = size_type_node;
@@ -13271,7 +13277,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
      Reversed order to ensure the above order is actually obtained.
   */
 
-#if ALLOW_WQEVENT_SAMPLING
+#if WQUEUE_PROFILE 
 
   name = create_tmp_var_name ("dominant_prematch_data_size");
   type = size_type_node;
@@ -13416,7 +13422,7 @@ build_wstream_df_frame_base_type (omp_context *ctx)
     TYPE_ALIGN (ctx->record_type) = DECL_ALIGN (field);
   ctx->base_frame.wstream_df_frame_field_steal_type = field;
 
-#endif // ALLOW_WQEVENT_SAMPLING
+#endif // WQUEUE_PROFILE
   
   name = create_tmp_var_name ("output_view_chain");
   type = ptr_type_node;
