@@ -53,9 +53,13 @@
 #define CACHE_LAST_STEAL_VICTIM 1
 
 /*
- * Dont know exactly what it does!
- * WARNING, programs using broadcast table-enabled library have to be built
- * with a broadcast table-enabled gcc.
+ * In openStream, a broadcast (peek operation) creates a copy of the viewed
+ * data for each peeking task. With a broadcast table, the number of copy is
+ * limited to one per numa node. This can significantly reduce the number of
+ * copies but comes with extra runtime overhead of managing the table.
+ * 
+ * WARNING: Enabling broadcast tables requires rebuilding the source codes
+ * using OpenStream.
  */
 
 #define USE_BROADCAST_TABLES 0
@@ -68,7 +72,7 @@
  * This may have a performance impact.
  */
 
-#define SLAB_ALLOCATOR_VERBOSE 0
+#define SLAB_ALLOCATOR_VERBOSE 1
 
 /*
  * Make HWLOC print information about the hardware and worker placement. This
@@ -76,24 +80,28 @@
  * the pre_main function.
  */
 
-#define HWLOC_VERBOSE 0
+#define HWLOC_VERBOSE 1
 
  /*********************** OpenStream Profiling Options ***********************/
 
 /*
  * Profile the work queues.
+ *
+ * WARNING: Enabling queue profiling requires rebuilding the source codes
+ * using OpenStream.
  */
 
-#define WQUEUE_PROFILE 0
+#define WQUEUE_PROFILE 1
 
 /*
  * MATRIX_PROFILE profiles the amount of information exchanged between the the
  * worker threads through the streams. The information is dumped inside the
  * specified file in a matrix form (line worker id to column worker id).
- * REQUIRES WQUEUE_PROFILE
+ * 
+ * Option requirement: WQUEUE_PROFILE
  */
 
-#define MATRIX_PROFILE 0
+#define MATRIX_PROFILE 1
 #define MATRIX_PROFILE_OUTPUT "wqueue_matrix.out"
 
 /*
@@ -106,7 +114,7 @@
  *   - The number of involuntary context switches (e.g. kernel scheduler intervention)
  */
 
-#define PROFILE_RUSAGE 0
+#define PROFILE_RUSAGE 1
 
  /*********************** OpenStream Probably Broken Options ***********************/
 
@@ -119,7 +127,7 @@
 #define NUM_PUSH_REORDER_SLOTS 0
 #define ALLOW_PUSH_REORDER (ALLOW_PUSHES && NUM_PUSH_REORDER_SLOTS > 0)
 
-#define MAX_WQEVENT_SAMPLES 0
+#define MAX_WQEVENT_SAMPLES 1000000
 #define TRACE_RT_INIT_STATE
 /* #define TRACE_DATA_READS */
 #define ALLOW_WQEVENT_SAMPLING (MAX_WQEVENT_SAMPLES > 0)
@@ -156,6 +164,10 @@
 /*
  * Some configuration checks
  */
+#if ALLOW_WQEVENT_SAMPLING && !WQUEUE_PROFILE
+#error "ALLOW_WQEVENT_SAMPLING defined, but WQUEUE_PROFILE != 1"
+#endif
+
 #if MATRIX_PROFILE && !WQUEUE_PROFILE
 #error "MATRIX_PROFILE defined, but WQUEUE_PROFILE != 1"
 #endif
