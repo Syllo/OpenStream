@@ -38,6 +38,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef TILE_SIZE
+#define TILE_SIZE 32
+#endif // TILE_SIZE
+
 bool mask(double x, double y, d2q9 *lbm) {
 
   double xmil = lbm->Dx;
@@ -149,16 +153,23 @@ void d2q9_init(double Lx, size_t nx, size_t ny, double Rc, double Dx,
 void d2q9_shift(d2q9 *lbm) {
   VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
   VLA_3D_definition(9, lbm->nx, lbm->ny, fnext_, lbm->fnext);
+#define min(x, y) ((x) < (y) ? (x) : (y))
   for (size_t k = 0; k < 9; k++) {
-#pragma omp for schedule(static) nowait
-    for (size_t i = 0; i < lbm->nx; i++) {
-      size_t i2 = (lbm->nx + i - (size_t)lbm->vel[k][0]) % lbm->nx;
-      for (size_t j = 0; j < lbm->ny; j++) {
-        size_t j2 = (lbm->ny + j - (size_t)lbm->vel[k][1]) % lbm->ny;
-        fnext_[k][i][j] = f_[k][i2][j2];
+    for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
+      for (size_t t2 = 0; t2 <= (lbm->ny - 1) / TILE_SIZE; t2++) {
+        size_t ubv1 = min(lbm->nx - 1, TILE_SIZE * t1 + (TILE_SIZE - 1));
+        for (size_t i = TILE_SIZE * t1; i <= ubv1; i++) {
+          size_t ubv2 = min(lbm->ny - 1, TILE_SIZE * t2 + (TILE_SIZE - 1));
+          size_t i2 = (lbm->nx + i - (size_t)lbm->vel[k][0]) % lbm->nx;
+          for (size_t j = TILE_SIZE * t2; j <= ubv2; j++) {
+            size_t j2 = (lbm->ny + j - (size_t)lbm->vel[k][1]) % lbm->ny;
+            fnext_[k][i][j] = f_[k][i2][j2];
+          }
+        }
       }
     }
   }
+#undef min
 }
 
 void d2q9_step(d2q9 *lbm) {
@@ -172,43 +183,57 @@ void d2q9_relax(d2q9 *lbm) {
   VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
   VLA_3D_definition(9, lbm->nx, lbm->ny, fnext_, lbm->fnext);
   VLA_3D_definition(3, lbm->nx, lbm->ny, w_, lbm->w);
-#pragma omp for schedule(static) nowait
-  for (size_t i = 0; i < lbm->nx; i++) {
-    for (size_t j = 0; j < lbm->ny; j++) {
-      double f[9];
-      double feq[9];
-      for (size_t k = 0; k < 9; k++) {
-        f[k] = fnext_[k][i][j];
-      }
-      double w[3];
-      kin_to_fluid(f, w, lbm);
-      fluid_to_kin(w, feq, lbm);
-      for (size_t k = 0; k < 9; k++) {
-        f_[k][i][j] = _RELAX * feq[k] + (1 - _RELAX) * fnext_[k][i][j];
-      }
-    }
-  }
-}
-
-void d2q9_boundary(d2q9 *lbm) {
-
-  VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
-#pragma omp for schedule(static) nowait
-  for (size_t i = 0; i < lbm->nx; i++) {
-    for (size_t j = 0; j < lbm->ny; j++) {
-      double x = (double)i * lbm->dx;
-      double y = (double)j * lbm->dx;
-      if (mask(x, y, lbm)) {
-        double wb[3];
-        imposed_data(x, y, lbm->tnow, wb, lbm);
-        double fb[9];
-        fluid_to_kin(wb, fb, lbm);
-        for (size_t k = 0; k < 9; k++) {
-          f_[k][i][j] = _RELAX * fb[k] + (1 - _RELAX) * f_[k][i][j];
+#define min(x, y) ((x) < (y) ? (x) : (y))
+  for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
+    for (size_t t2 = 0; t2 <= (lbm->ny - 1) / TILE_SIZE; t2++) {
+      size_t ubv1 = min(lbm->nx - 1, TILE_SIZE * t1 + (TILE_SIZE - 1));
+      for (size_t i = TILE_SIZE * t1; i <= ubv1; i++) {
+        size_t ubv2 = min(lbm->ny - 1, TILE_SIZE * t2 + (TILE_SIZE - 1));
+        for (size_t j = TILE_SIZE * t2; j <= ubv2; j++) {
+          double f[9];
+          double feq[9];
+          for (size_t k = 0; k < 9; k++) {
+            f[k] = fnext_[k][i][j];
+          }
+          double w[3];
+          kin_to_fluid(f, w, lbm);
+          fluid_to_kin(w, feq, lbm);
+          for (size_t k = 0; k < 9; k++) {
+            f_[k][i][j] = _RELAX * feq[k] + (1 - _RELAX) * fnext_[k][i][j];
+          }
         }
       }
     }
   }
+#undef min
+}
+
+void d2q9_boundary(d2q9 *lbm) {
+  VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
+
+#define min(x, y) ((x) < (y) ? (x) : (y))
+  for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
+    for (size_t t2 = 0; t2 <= (lbm->ny - 1) / TILE_SIZE; t2++) {
+      size_t ubv1 = min(lbm->nx - 1, TILE_SIZE * t1 + (TILE_SIZE - 1));
+      for (size_t i = TILE_SIZE * t1; i <= ubv1; i++) {
+        size_t ubv2 = min(lbm->ny - 1, TILE_SIZE * t2 + (TILE_SIZE - 1));
+        for (size_t j = TILE_SIZE * t2; j <= ubv2; j++) {
+          double x = (double)i * lbm->dx;
+          double y = (double)j * lbm->dx;
+          if (mask(x, y, lbm)) {
+            double wb[3];
+            imposed_data(x, y, lbm->tnow, wb, lbm);
+            double fb[9];
+            fluid_to_kin(wb, fb, lbm);
+            for (size_t k = 0; k < 9; k++) {
+              f_[k][i][j] = _RELAX * fb[k] + (1 - _RELAX) * f_[k][i][j];
+            }
+          }
+        }
+      }
+    }
+  }
+#undef min
 }
 
 void d2q9_solve(d2q9 *lbm, double tmax, bool verbose) {
