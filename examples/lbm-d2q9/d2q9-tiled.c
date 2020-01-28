@@ -39,7 +39,7 @@
 #include <stdlib.h>
 
 #ifndef TILE_SIZE
-#define TILE_SIZE 32
+#define TILE_SIZE 9
 #endif // TILE_SIZE
 
 bool mask(double x, double y, d2q9 *lbm) {
@@ -124,12 +124,12 @@ void d2q9_init(double Lx, size_t nx, size_t ny, double Rc, double Dx,
 
   lbm->smax = 1;
 
-  lbm->f = calloc(1, VLA_3D_size(9, nx, ny));
-  lbm->fnext = calloc(1, VLA_3D_size(9, nx, ny));
-  lbm->w = calloc(1, VLA_3D_size(3, nx, ny));
+  lbm->f = calloc(1, VLA_3D_size(nx, ny, 9));
+  lbm->fnext = calloc(1, VLA_3D_size(nx, ny, 9));
+  lbm->w = calloc(1, VLA_3D_size(nx, ny, 3));
 
-  VLA_3D_definition(9, nx, ny, f_, lbm->f);
-  VLA_3D_definition(3, nx, ny, w_, lbm->w);
+  VLA_3D_definition(nx, ny, 9, f_, lbm->f);
+  VLA_3D_definition(nx, ny, 3, w_, lbm->w);
 
   for (size_t i = 0; i < nx; i++) {
     for (size_t j = 0; j < ny; j++) {
@@ -138,32 +138,32 @@ void d2q9_init(double Lx, size_t nx, size_t ny, double Rc, double Dx,
       double y = (double)j * lbm->dx;
       double t = 0;
       imposed_data(x, y, t, w, lbm);
-      w_[0][i][j] = w[0];
-      w_[1][i][j] = w[1];
-      w_[2][i][j] = w[2];
+      w_[i][j][0] = w[0];
+      w_[i][j][1] = w[1];
+      w_[i][j][2] = w[2];
 
-      double f[9];
-      fluid_to_kin(w, f, lbm);
-      for (size_t k = 0; k < 9; k++)
-        f_[k][i][j] = f[k];
+      // double f[9];
+      fluid_to_kin(w, &f_[i][j][0], lbm);
+      // for (size_t k = 0; k < 9; k++)
+      //   f_[i][j][k] = f[k];
     }
   }
 }
 
 void d2q9_shift(d2q9 *lbm) {
-  VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
-  VLA_3D_definition(9, lbm->nx, lbm->ny, fnext_, lbm->fnext);
+  VLA_3D_definition(lbm->nx, lbm->ny, 9, f_, lbm->f);
+  VLA_3D_definition(lbm->nx, lbm->ny, 9, fnext_, lbm->fnext);
 #define min(x, y) ((x) < (y) ? (x) : (y))
-  for (size_t k = 0; k < 9; k++) {
-    for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
-      for (size_t t2 = 0; t2 <= (lbm->ny - 1) / TILE_SIZE; t2++) {
-        size_t ubv1 = min(lbm->nx - 1, TILE_SIZE * t1 + (TILE_SIZE - 1));
-        for (size_t i = TILE_SIZE * t1; i <= ubv1; i++) {
-          size_t ubv2 = min(lbm->ny - 1, TILE_SIZE * t2 + (TILE_SIZE - 1));
-          size_t i2 = (lbm->nx + i - (size_t)lbm->vel[k][0]) % lbm->nx;
-          for (size_t j = TILE_SIZE * t2; j <= ubv2; j++) {
+  for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
+    for (size_t t2 = 0; t2 <= (lbm->ny - 1) / TILE_SIZE; t2++) {
+      size_t ubv1 = min(lbm->nx - 1, TILE_SIZE * t1 + (TILE_SIZE - 1));
+      for (size_t i = TILE_SIZE * t1; i <= ubv1; i++) {
+        size_t ubv2 = min(lbm->ny - 1, TILE_SIZE * t2 + (TILE_SIZE - 1));
+        for (size_t j = TILE_SIZE * t2; j <= ubv2; j++) {
+          for (size_t k = 0; k < 9; k++) {
+            size_t i2 = (lbm->nx + i - (size_t)lbm->vel[k][0]) % lbm->nx;
             size_t j2 = (lbm->ny + j - (size_t)lbm->vel[k][1]) % lbm->ny;
-            fnext_[k][i][j] = f_[k][i2][j2];
+            fnext_[i][j][k] = f_[i2][j2][k];
           }
         }
       }
@@ -179,10 +179,9 @@ void d2q9_step(d2q9 *lbm) {
 }
 
 void d2q9_relax(d2q9 *lbm) {
+  VLA_3D_definition(lbm->nx, lbm->ny, 9, f_, lbm->f);
+  VLA_3D_definition(lbm->nx, lbm->ny, 9, fnext_, lbm->fnext);
 
-  VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
-  VLA_3D_definition(9, lbm->nx, lbm->ny, fnext_, lbm->fnext);
-  VLA_3D_definition(3, lbm->nx, lbm->ny, w_, lbm->w);
 #define min(x, y) ((x) < (y) ? (x) : (y))
   for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
     for (size_t t2 = 0; t2 <= (lbm->ny - 1) / TILE_SIZE; t2++) {
@@ -190,16 +189,16 @@ void d2q9_relax(d2q9 *lbm) {
       for (size_t i = TILE_SIZE * t1; i <= ubv1; i++) {
         size_t ubv2 = min(lbm->ny - 1, TILE_SIZE * t2 + (TILE_SIZE - 1));
         for (size_t j = TILE_SIZE * t2; j <= ubv2; j++) {
-          double f[9];
-          double feq[9];
-          for (size_t k = 0; k < 9; k++) {
-            f[k] = fnext_[k][i][j];
-          }
+          // double f[9];
+          // for (size_t k = 0; k < 9; k++) {
+          //   f[k] = fnext_[k][i][j];
+          // }
           double w[3];
-          kin_to_fluid(f, w, lbm);
+          kin_to_fluid(&fnext_[i][j][0], w, lbm);
+          double feq[9];
           fluid_to_kin(w, feq, lbm);
           for (size_t k = 0; k < 9; k++) {
-            f_[k][i][j] = _RELAX * feq[k] + (1 - _RELAX) * fnext_[k][i][j];
+            f_[i][j][k] = _RELAX * feq[k] + (1 - _RELAX) * fnext_[i][j][k];
           }
         }
       }
@@ -209,7 +208,7 @@ void d2q9_relax(d2q9 *lbm) {
 }
 
 void d2q9_boundary(d2q9 *lbm) {
-  VLA_3D_definition(9, lbm->nx, lbm->ny, f_, lbm->f);
+  VLA_3D_definition(lbm->nx, lbm->ny, 9, f_, lbm->f);
 
 #define min(x, y) ((x) < (y) ? (x) : (y))
   for (size_t t1 = 0; t1 <= (lbm->nx - 1) / TILE_SIZE; t1++) {
@@ -226,7 +225,7 @@ void d2q9_boundary(d2q9 *lbm) {
             double fb[9];
             fluid_to_kin(wb, fb, lbm);
             for (size_t k = 0; k < 9; k++) {
-              f_[k][i][j] = _RELAX * fb[k] + (1 - _RELAX) * f_[k][i][j];
+              f_[i][j][k] = _RELAX * fb[k] + (1 - _RELAX) * f_[i][j][k];
             }
           }
         }
@@ -291,15 +290,15 @@ void d2q9_solve(d2q9 *lbm, double tmax, bool verbose) {
 #pragma omp for schedule(static)
     for (size_t i = 0; i < lbm->nx; i++) {
       for (size_t j = 0; j < lbm->ny; j++) {
-        double f[9];
-        for (size_t k = 0; k < 9; k++) {
-          f[k] = fnext_[k][i][j];
-        }
-        double w[3];
-        kin_to_fluid(f, w, lbm);
-        for (size_t k = 0; k < 3; k++) {
-          w_[k][i][j] = w[k];
-        }
+        // double f[9];
+        // for (size_t k = 0; k < 9; k++) {
+        //   f[k] = fnext_[k][i][j];
+        // }
+        // double w[3];
+        kin_to_fluid(&fnext_[i][j][0], &w_[i][j][0], lbm);
+        // for (size_t k = 0; k < 3; k++) {
+        //   w_[i][j][k] = w[k];
+        // }
       }
     }
   }
@@ -340,7 +339,7 @@ extern inline void kin_to_fluid(const double *restrict f, double *restrict w,
                                 d2q9 *lbm);
 
 void d2q9_dump_matrix(FILE *out, d2q9 *lbm, int var) {
-  VLA_3D_definition(3, lbm->nx, lbm->ny, w_, lbm->w);
+  VLA_3D_definition(lbm->nx, lbm->ny, 3, w_, lbm->w);
 
   fprintf(out, "%zu ", lbm->nx);
   for (size_t i = 0; i < lbm->nx; i++) {
@@ -350,9 +349,9 @@ void d2q9_dump_matrix(FILE *out, d2q9 *lbm, int var) {
   for (size_t j = 0; j < lbm->ny; j++) {
     fprintf(out, "%.3f ", (double)j * lbm->dx);
     for (size_t i = 0; i < lbm->nx; i++) {
-      double w[3];
-      for (size_t k = 0; k < 3; k++)
-        w[k] = w_[k][i][j];
+      double *w = &w_[i][j][0];
+      // for (size_t k = 0; k < 3; k++)
+      //   w[k] = w_[i][j][k];
       double val;
       if (var < 3) {
         val = w[var];
@@ -369,7 +368,7 @@ void d2q9_dump_matrix(FILE *out, d2q9 *lbm, int var) {
 }
 
 void d2q9_dump(FILE *out, d2q9 *lbm, int var) {
-  VLA_3D_definition(3, lbm->nx, lbm->ny, w_, lbm->w);
+  VLA_3D_definition(lbm->nx, lbm->ny, 3, w_, lbm->w);
 
   double posY = 0.;
   for (size_t j = 0; j < lbm->ny; j++, posY += lbm->dx) {
@@ -377,11 +376,11 @@ void d2q9_dump(FILE *out, d2q9 *lbm, int var) {
     for (size_t i = 0; i < lbm->nx; i++, posX += lbm->dx) {
       double val;
       if (var < 3) {
-        val = w_[var][i][j];
+        val = w_[i][j][var];
       } else {
-        double r = w_[0][i][j];
-        double u = w_[1][i][j] / r;
-        double v = w_[2][i][j] / r;
+        double r = w_[i][j][0];
+        double u = w_[i][j][1] / r;
+        double v = w_[i][j][2] / r;
         val = sqrt(u * u + v * v);
       }
       fprintf(out, "%e %e %e\n", posX, posY, val);
