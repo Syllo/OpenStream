@@ -421,6 +421,13 @@ tdecrease_n (void *data, size_t n, bool is_write)
 	    }
 	}
 #endif // ALLOW_PUSHES
+
+#if WSTREAM_FUSE_TASKS
+
+
+
+#endif // WSTREAM_FUSE_TASK
+
 #if DISABLE_WQUEUE_LOCAL_CACHE
 	cdeque_push_bottom (&cthread->work_deque,
 			    (wstream_df_type) fp);
@@ -430,6 +437,7 @@ tdecrease_n (void *data, size_t n, bool is_write)
 			    (wstream_df_type) cthread->own_next_cached_thread);
       cthread->own_next_cached_thread = fp;
 #endif // DISABLE_WQUEUE_LOCAL_CACHE
+
     }
 
   trace_state_restore(cthread);
@@ -935,18 +943,20 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
 #endif
 
     wstream_df_frame_p fp = obtain_work(cthread, wstream_df_worker_threads);
+    exec_work_frame(fp);
 
-    if (fp != NULL) {
-      cthread->current_work_fn = fp->work_fn;
-      cthread->current_frame = fp;
+  }
+}
 
-      wqueue_counters_enter_runtime(current_thread);
-      trace_task_exec_start(cthread, fp);
-      trace_state_change(cthread, WORKER_STATE_TASKEXEC);
+void exec_work_frame(wstream_df_frame_p fp) {
+  wstream_df_thread_p cthread = current_thread;
+  if (fp != NULL) {
+    cthread->current_work_fn = fp->work_fn;
+    cthread->current_frame = fp;
 
-      wqueue_counters_profile_rusage(cthread);
-      update_papi(cthread);
-      trace_runtime_counters(cthread);
+    wqueue_counters_enter_runtime(current_thread);
+    trace_task_exec_start(cthread, fp);
+    trace_state_change(cthread, WORKER_STATE_TASKEXEC);
 
 #if RUNTIME_TASKS_INFO
       struct timespec start_time;
@@ -966,30 +976,30 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
       trace_runtime_counters(cthread);
       update_papi(cthread);
 
-      __compiler_fence;
+    __compiler_fence;
 
-      /* It is possible that the work function was suspended then
-         its continuation migrated.  We need to restore TLS local
-         saves.  */
+    /* It is possible that the work function was suspended then
+       its continuation migrated.  We need to restore TLS local
+       saves.  */
 
-      /* WARNING: Hack to prevent GCC from deadcoding the next
-         assignment (volatile qualifier does not prevent the
-         optimization).  CTHREAD is guaranteed not to be null
-         here.  */
-      if (cthread != NULL) {
+    /* WARNING: Hack to prevent GCC from deadcoding the next
+       assignment (volatile qualifier does not prevent the
+       optimization).  CTHREAD is guaranteed not to be null
+       here.  */
+    if (cthread != NULL) {
 #ifdef __aarch64__
-        __asm __volatile("str %[current_thread], %[cthread]"
-                         : [ cthread ] "=m"(cthread)
-                         : [ current_thread ] "r"(current_thread)
-                         : "memory");
+      __asm __volatile("str %[current_thread], %[cthread]"
+                       : [ cthread ] "=m"(cthread)
+                       : [ current_thread ] "r"(current_thread)
+                       : "memory");
 #else
-        __asm__ __volatile__("mov %[current_thread], %[cthread]"
-                             : [ cthread ] "=m"(cthread)
-                             : [ current_thread ] "R"(current_thread)
-                             : "memory");
+      __asm__ __volatile__("mov %[current_thread], %[cthread]"
+                           : [ cthread ] "=m"(cthread)
+                           : [ current_thread ] "R"(current_thread)
+                           : "memory");
 #endif
-      }
-      __compiler_fence;
+    }
+    __compiler_fence;
 
 #if RUNTIME_TASKS_INFO
       struct task_type_info *info =
@@ -1011,15 +1021,14 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
       cthread->current_work_fn = NULL;
       cthread->current_frame = NULL;
 
-      trace_state_restore(cthread);
+    trace_state_restore(cthread);
 
-      wqueue_counters_enter_runtime(current_thread);
-      inc_wqueue_counter(&cthread->tasks_executed, 1);
-    } else {
+    wqueue_counters_enter_runtime(current_thread);
+    inc_wqueue_counter(&cthread->tasks_executed, 1);
+  } else {
 #if WS_NO_YIELD_SPIN
-      sched_yield();
+    sched_yield();
 #endif
-    }
   }
 }
 

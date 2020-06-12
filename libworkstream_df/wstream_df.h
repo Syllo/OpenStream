@@ -14,6 +14,7 @@
 #include "profiling.h"
 #include "broadcast.h"
 #include "runtime_tasks_info.h"
+#include "task_fusion.h"
 
 #if ALLOW_PUSHES
 #define FIFO_SIZE NUM_PUSH_SLOTS
@@ -231,6 +232,12 @@ typedef struct __attribute__ ((aligned (64))) wstream_df_thread
   hwloc_obj_t last_steal_from;
 #endif
 
+#if WSTREAM_FUSE_TASKS
+  unsigned encountered_task_types;
+  void **task_work_addresses;
+  struct wstream_fused_macro_task_loop *fused_tasks;
+#endif
+
   void* current_work_fn;
   void* current_frame;
   struct worker_event* last_tcreate_event;
@@ -259,6 +266,8 @@ void __built_in_wstream_df_inc_frame_ref(wstream_df_frame_p fp, size_t n);
 void __built_in_wstream_df_dec_frame_ref(wstream_df_frame_p fp, size_t n);
 void __built_in_wstream_df_inc_view_ref(wstream_df_view_p view, size_t n);
 void __built_in_wstream_df_dec_view_ref(wstream_df_view_p view, size_t n);
+
+void exec_work_frame(wstream_df_frame_p fp);
 
 #if USE_BROADCAST_TABLES
 void dec_broadcast_table_ref(wstream_df_broadcast_table_p bt);

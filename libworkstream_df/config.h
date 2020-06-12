@@ -53,6 +53,16 @@
 #define CACHE_LAST_STEAL_VICTIM 1
 
 /*
+ * Task fusion capability of OpenStream:
+ * - WSTREAM_FUSE_MACRO_TASK_LOOP: fuse task by merging the work functions of ready tasks inside a macro task that 
+ */
+
+#define WSTREAM_FUSE_TASKS 1
+
+
+#define WSTREAM_FUSE_MACRO_TASK_LOOP 1
+
+/*
  * In openStream, a broadcast (peek operation) creates a copy of the viewed
  * data for each peeking task. With a broadcast table, the number of copy is
  * limited to one per numa node. This can significantly reduce the number of
