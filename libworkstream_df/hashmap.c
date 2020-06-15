@@ -436,8 +436,6 @@ void hashmap_clear(struct hashmap *map)
  */
 void hashmap_reset(struct hashmap *map)
 {
-    struct hashmap_entry *new_table;
-
     HASHMAP_ASSERT(map != NULL);
 
     hashmap_clear(map);
@@ -729,3 +727,7 @@ double hashmap_collisions_variance(const struct hashmap *map)
     return total_variance / map->num_entries;
 }
 #endif
+
+extern inline size_t hashmap_hash_pointer(const void *key);
+
+extern inline int hashmap_compare_pointer(const void *key1, const void* key2);

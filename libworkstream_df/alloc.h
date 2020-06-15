@@ -26,6 +26,12 @@ struct wstream_df_thread;
 #define PAGE_SIZE 4096
 #define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
+static inline void *align_up(void *addr, size_t alignment) {
+  uintptr_t ptr = (uintptr_t)addr;
+  ptr = (ptr + alignment - 1) & (~(alignment - 1));
+  return (void *)ptr;
+}
+
 static inline void* align_page_boundary(void* addr)
 {
 	return (void*)(((long)addr) & ~(PAGE_SIZE-1));

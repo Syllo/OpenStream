@@ -24,6 +24,15 @@
 #include "reuse.h"
 #include "prng.h"
 #include "hwloc-support.h"
+#include "hashmap.h"
+#include "task_fusion.h"
+
+#if WSTREAM_FUSE_TASKS
+
+typedef void(*workfn_ptr_type)(void*);
+HASHMAP_FUNCS_CREATE(fused_tl, workfn_ptr_type, struct wstream_fused_macro_task_loop)
+
+#endif
 
 #ifdef DEPENDENCE_AWARE_ALLOC
 	#error "Obsolete option 'dependence-aware allocation' enabled"
@@ -190,12 +199,6 @@ wstream_df_taskwait ()
 
 /***************************************************************************/
 /***************************************************************************/
-
-static inline void *align_up(void *addr, size_t alignment) {
-  uintptr_t ptr = (uintptr_t)addr;
-  ptr = (ptr + alignment - 1) & (~(alignment - 1));
-  return (void *)ptr;
-}
 
 /* Create a new thread, with frame pointer size, and sync counter */
 void *__builtin_ia32_tcreate(size_t sc, size_t size, void *wfn, bool has_lp) {
@@ -422,11 +425,41 @@ tdecrease_n (void *data, size_t n, bool is_write)
 	}
 #endif // ALLOW_PUSHES
 
-#if WSTREAM_FUSE_TASKS
+#if WSTREAM_FUSE_MACRO_TASK_LOOP
 
+        struct wstream_fused_macro_task_loop *fl = fused_tl_hashmap_get(
+            &cthread->work_pointer_to_fuse_task_map, &fp->work_fn);
+        if (!fl) { // first time encountering this function
+          struct wstream_fused_macro_task_loop *new_fuse_candidate = slab_alloc(
+              cthread, cthread->slab_cache, sizeof(*new_fuse_candidate));
+          fused_tl_hashmap_put(&cthread->work_pointer_to_fuse_task_map,
+                               &fp->work_fn, new_fuse_candidate);
+          new_fuse_candidate->max_tasks_to_fuse = num_default_fuse_task;
+          new_fuse_candidate->task_frames =
+              slab_alloc(cthread, cthread->slab_cache,
+                         new_fuse_candidate->max_tasks_to_fuse *
+                             sizeof(new_fuse_candidate->task_frames));
+          new_fuse_candidate->num_tasks_fused = 0;
+        }
+        fl->task_frames[fl->num_tasks_fused++] = fp;
+        if (fl->num_tasks_fused ==
+            fl->max_tasks_to_fuse) { // lets schedule the fused task
+          void *new_frame = __builtin_ia32_tcreate(
+              0,
+              sizeof(wstream_df_frame_t) +
+                  alignof(struct wstream_fused_macro_task_loop) +
+                  sizeof(struct wstream_fused_macro_task_loop),
+              exec_macro_task_loop, false);
+          wstream_df_frame_p fused_task_frame = (wstream_df_frame_p)new_frame;
+          struct wstream_fused_macro_task_loop *fused_frame_data =
+              wstream_fused_macro_task_loop_location_in_frame(new_frame);
+          *fused_frame_data = *fl;
+          fused_tl_hashmap_remove(&cthread->work_pointer_to_fuse_task_map,
+                                  &fp->work_fn);
+          cdeque_push_bottom(&cthread->work_deque, (wstream_df_type)new_frame);
+        }
 
-
-#endif // WSTREAM_FUSE_TASK
+#else // WSTREAM_FUSE_MACRO_TASK_LOOP
 
 #if DISABLE_WQUEUE_LOCAL_CACHE
 	cdeque_push_bottom (&cthread->work_deque,
@@ -438,6 +471,7 @@ tdecrease_n (void *data, size_t n, bool is_write)
       cthread->own_next_cached_thread = fp;
 #endif // DISABLE_WQUEUE_LOCAL_CACHE
 
+  #endif // WSTREAM_FUSE_MACRO_TASK_LOOP
     }
 
   trace_state_restore(cthread);
@@ -924,6 +958,10 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
        and this stack is recycled, so no need to restore TLS local
        saves.  */
   }
+
+#if WSTREAM_FUSE_TASKS
+  hashmap_init(&cthread->work_pointer_to_fuse_task_map, hashmap_hash_pointer, hashmap_compare_pointer, 0);
+#endif
 
   trace_state_change(cthread, WORKER_STATE_SEEKING);
   while (true) {

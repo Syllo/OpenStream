@@ -261,8 +261,15 @@ int hashmap_compare_string_i(const void *a, const void *b);
 /*
  * Hash pointer
  */
-static inline size_t hashmap_hash_pointer(const void *key) {
-    return (size_t)key >> (size_t)(log2(sizeof(void*)));
+inline size_t hashmap_hash_pointer(const void *key) {
+    void **ptr = (void**)key;
+    return (size_t)*ptr >> (size_t)(log2(sizeof(void*)));
+}
+
+inline int hashmap_compare_pointer(const void *key1, const void* key2) {
+    void **ptr1 = (void**)key1;
+    void **ptr2 = (void**)key2;
+    return *ptr1 != *ptr2;
 }
 
 #ifdef HASHMAP_METRICS
