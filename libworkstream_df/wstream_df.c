@@ -27,13 +27,6 @@
 #include "hashmap.h"
 #include "task_fusion.h"
 
-#if WSTREAM_FUSE_TASKS
-
-typedef void(*workfn_ptr_type)(void*);
-HASHMAP_FUNCS_CREATE(fused_tl, workfn_ptr_type, struct wstream_fused_macro_task_loop)
-
-#endif
-
 #ifdef DEPENDENCE_AWARE_ALLOC
 	#error "Obsolete option 'dependence-aware allocation' enabled"
 #endif
@@ -444,19 +437,13 @@ tdecrease_n (void *data, size_t n, bool is_write)
         fl->task_frames[fl->num_tasks_fused++] = fp;
         if (fl->num_tasks_fused ==
             fl->max_tasks_to_fuse) { // lets schedule the fused task
-          void *new_frame = __builtin_ia32_tcreate(
-              0,
-              sizeof(wstream_df_frame_t) +
-                  alignof(struct wstream_fused_macro_task_loop) +
-                  sizeof(struct wstream_fused_macro_task_loop),
-              exec_macro_task_loop, false);
-          wstream_df_frame_p fused_task_frame = (wstream_df_frame_p)new_frame;
+          wstream_df_frame_p fused_task_frame = frame_pointer_for_fused_task(exec_macro_task_loop);
           struct wstream_fused_macro_task_loop *fused_frame_data =
-              wstream_fused_macro_task_loop_location_in_frame(new_frame);
+              wstream_fused_macro_task_loop_location_in_frame(fused_task_frame);
           *fused_frame_data = *fl;
           fused_tl_hashmap_remove(&cthread->work_pointer_to_fuse_task_map,
                                   &fp->work_fn);
-          cdeque_push_bottom(&cthread->work_deque, (wstream_df_type)new_frame);
+          cdeque_push_bottom(&cthread->work_deque, (wstream_df_type)fused_task_frame);
         }
 
 #else // WSTREAM_FUSE_MACRO_TASK_LOOP
@@ -959,7 +946,7 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
        saves.  */
   }
 
-#if WSTREAM_FUSE_TASKS
+#if WSTREAM_FUSE_MACRO_TASK_LOOP
   hashmap_init(&cthread->work_pointer_to_fuse_task_map, hashmap_hash_pointer, hashmap_compare_pointer, 0);
 #endif
 
