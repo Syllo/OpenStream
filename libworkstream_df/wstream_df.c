@@ -420,29 +420,28 @@ tdecrease_n (void *data, size_t n, bool is_write)
 
 #if WSTREAM_FUSE_MACRO_TASK_LOOP
 
-        struct wstream_fused_macro_task_loop *fl = fused_tl_hashmap_get(
-            &cthread->work_pointer_to_fuse_task_map, &fp->work_fn);
+        struct wstream_fused_macro_task_loop *fl =
+            fused_tl_hashmap_get(&cthread->work_pointer_to_fuse_task_map, &fp->work_fn);
         if (!fl) { // first time encountering this function
-          struct wstream_fused_macro_task_loop *new_fuse_candidate = slab_alloc(
-              cthread, cthread->slab_cache, sizeof(*new_fuse_candidate));
-          fused_tl_hashmap_put(&cthread->work_pointer_to_fuse_task_map,
-                               &fp->work_fn, new_fuse_candidate);
+          // fprintf(stderr, "First time seing %p\n", fp->work_fn);
+          struct wstream_fused_macro_task_loop *new_fuse_candidate =
+              slab_alloc(cthread, cthread->slab_cache, sizeof(*new_fuse_candidate));
+          fused_tl_hashmap_put(&cthread->work_pointer_to_fuse_task_map, &fp->work_fn,
+                               new_fuse_candidate);
           new_fuse_candidate->max_tasks_to_fuse = num_default_fuse_task;
-          new_fuse_candidate->task_frames =
-              slab_alloc(cthread, cthread->slab_cache,
-                         new_fuse_candidate->max_tasks_to_fuse *
-                             sizeof(new_fuse_candidate->task_frames));
+          new_fuse_candidate->task_frames = slab_alloc(cthread, cthread->slab_cache,
+                                                       new_fuse_candidate->max_tasks_to_fuse *
+                                                           sizeof(new_fuse_candidate->task_frames));
           new_fuse_candidate->num_tasks_fused = 0;
+          fl = new_fuse_candidate;
         }
         fl->task_frames[fl->num_tasks_fused++] = fp;
-        if (fl->num_tasks_fused ==
-            fl->max_tasks_to_fuse) { // lets schedule the fused task
-          wstream_df_frame_p fused_task_frame = frame_pointer_for_fused_task(exec_macro_task_loop);
+        if (fl->num_tasks_fused == fl->max_tasks_to_fuse) { // lets schedule the fused task
+          wstream_df_frame_p fused_task_frame = frame_pointer_for_fused_task();
           struct wstream_fused_macro_task_loop *fused_frame_data =
               wstream_fused_macro_task_loop_location_in_frame(fused_task_frame);
           *fused_frame_data = *fl;
-          fused_tl_hashmap_remove(&cthread->work_pointer_to_fuse_task_map,
-                                  &fp->work_fn);
+          fused_tl_hashmap_remove(&cthread->work_pointer_to_fuse_task_map, &fp->work_fn);
           cdeque_push_bottom(&cthread->work_deque, (wstream_df_type)fused_task_frame);
         }
 
@@ -946,10 +945,6 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
        saves.  */
   }
 
-#if WSTREAM_FUSE_MACRO_TASK_LOOP
-  hashmap_init(&cthread->work_pointer_to_fuse_task_map, hashmap_hash_pointer, hashmap_compare_pointer, 0);
-#endif
-
   trace_state_change(cthread, WORKER_STATE_SEEKING);
   while (true) {
     if (cthread->yield) {
@@ -1349,6 +1344,10 @@ void pre_main()
     init_wqueue_counters(wstream_df_worker_threads[0]);
 #if RUNTIME_TASKS_INFO
     current_thread->runtime_tasks_info = alloc_tti_map();
+#endif
+
+#if WSTREAM_FUSE_MACRO_TASK_LOOP
+  hashmap_init(&current_thread->work_pointer_to_fuse_task_map, hashmap_hash_pointer, hashmap_compare_pointer, 0);
 #endif
 
     wstream_df_worker_threads[0]->current_work_fn = (void *)main;

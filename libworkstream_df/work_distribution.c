@@ -763,9 +763,10 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
   if (fp == NULL) {
     for (struct hashmap_iter *iter = hashmap_iter(&cthread->work_pointer_to_fuse_task_map); iter;
          iter = hashmap_iter_next(&cthread->work_pointer_to_fuse_task_map, iter)) {
+      // fprintf(stderr, "Running merge task because nothing to do\n");
       struct wstream_fused_macro_task_loop *fl = fused_tl_hashmap_iter_get_data(iter);
       // For now take the first fused task and be happy with it
-      wstream_df_frame_p fused_task_frame = frame_pointer_for_fused_task(exec_macro_task_loop);
+      wstream_df_frame_p fused_task_frame = frame_pointer_for_fused_task();
       struct wstream_fused_macro_task_loop *fused_frame_data =
           wstream_fused_macro_task_loop_location_in_frame(fused_task_frame);
       *fused_frame_data = *fl;
