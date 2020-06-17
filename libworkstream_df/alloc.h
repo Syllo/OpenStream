@@ -15,8 +15,6 @@
 #include "error.h"
 #include "glib_extras.h"
 
-struct wstream_df_thread;
-
 #define SLAB_INITIAL_MEM       (1 << 30)
 #define SLAB_GLOBAL_REFILL_MEM (1 << 30)
 

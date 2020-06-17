@@ -761,18 +761,31 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
 
 #if WSTREAM_FUSE_MACRO_TASK_LOOP
   if (fp == NULL) {
+    // If no work yet, run the macro task having the most fused tasks
+    struct wstream_task_type_fuse_info *best_macro_task = NULL;
     for (struct hashmap_iter *iter = hashmap_iter(&cthread->work_pointer_to_fuse_task_map); iter;
          iter = hashmap_iter_next(&cthread->work_pointer_to_fuse_task_map, iter)) {
-      // fprintf(stderr, "Running merge task because nothing to do\n");
-      struct wstream_fused_macro_task_loop *fl = fused_tl_hashmap_iter_get_data(iter);
-      // For now take the first fused task and be happy with it
-      wstream_df_frame_p fused_task_frame = frame_pointer_for_fused_task();
+      struct wstream_task_type_fuse_info *fuse_info = fused_tl_hashmap_iter_get_data(iter);
+      if (best_macro_task == NULL) {
+        if (fuse_info->fused_frames.num_tasks_fused > 0) {
+          best_macro_task = fuse_info;
+        }
+      } else {
+        if (fuse_info->fused_frames.num_tasks_fused >
+            best_macro_task->fused_frames.num_tasks_fused) { // For now take the first fused task and be happy with it
+          best_macro_task = fuse_info;
+        }
+      }
+    }
+    if (best_macro_task) {
+      wstream_df_frame_p fused_task_frame = alloc_frame_for_fused_task();
       struct wstream_fused_macro_task_loop *fused_frame_data =
           wstream_fused_macro_task_loop_location_in_frame(fused_task_frame);
-      *fused_frame_data = *fl;
-      iter = hashmap_iter_remove(&cthread->work_pointer_to_fuse_task_map, iter);
+      *fused_frame_data = best_macro_task->fused_frames;
+      best_macro_task->fused_frames.task_frames = alloc_task_frame_array(best_macro_task->best_amount_to_fuse);
+      best_macro_task->fused_frames.num_tasks_fused = 0;
+      best_macro_task->fused_frames.max_tasks_to_fuse = best_macro_task->best_amount_to_fuse;
       fp = fused_task_frame;
-      break;
     }
   }
 #endif
