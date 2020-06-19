@@ -5,7 +5,7 @@
 
 #include "hashmap.h"
 
-#define num_default_fuse_task 3
+#define num_default_fuse_task 1
 
 typedef void (*workfn_ptr_type)(void *);
 

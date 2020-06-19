@@ -3,6 +3,7 @@
 #include "alloc.h"
 #include "config.h"
 #include "task_fusion.h"
+#include "numa.h"
 #include "wstream_df.h"
 
 #ifdef WSTREAM_FUSE_TASKS
@@ -18,17 +19,23 @@ static void exec_macro_task_loop(void *task_frame_ptr) {
     exec_work_frame(fp);
   }
   wstream_df_frame_p frame = (wstream_df_frame_p)task_frame_ptr;
-  slab_free(current_thread->slab_cache, fused->task_frames);
-  __built_in_wstream_df_dec_frame_ref(frame, 1);
+  unsigned id = slab_allocator_of(fused->task_frames);
+  wstream_df_numa_node_p node = numa_node_by_id(id);
+  slab_free(&node->slab_cache, fused->task_frames);
+  id = slab_allocator_of(frame);
+  node = numa_node_by_id(id);
+  slab_free(&node->slab_cache, frame);
 }
 
 struct wstream_df_frame *alloc_frame_for_fused_task() {
   // fprintf(stderr, "Allocating fused frame\n");
-  void *new_frame = __builtin_ia32_tcreate(0,
+  wstream_df_frame_p new_frame = slab_alloc(current_thread, current_thread->slab_cache,
                                            sizeof(wstream_df_frame_t) +
                                                alignof(struct wstream_fused_macro_task_loop) +
-                                               sizeof(struct wstream_fused_macro_task_loop),
-                                           exec_macro_task_loop, false);
+                                               sizeof(struct wstream_fused_macro_task_loop));
+  memset(new_frame, 0, sizeof(wstream_df_frame_t));
+  new_frame->work_fn = exec_macro_task_loop;
+
   return new_frame;
 }
 
