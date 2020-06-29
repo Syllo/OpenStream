@@ -15,7 +15,6 @@
 #include "broadcast.h"
 #include "runtime_tasks_info.h"
 #include "task_fusion.h"
-#include "hashmap.h"
 
 #if ALLOW_PUSHES
 #define FIFO_SIZE NUM_PUSH_SLOTS
@@ -234,9 +233,9 @@ typedef struct __attribute__ ((aligned (64))) wstream_df_thread
 #endif
 
 #if WSTREAM_FUSE_TASKS
-  unsigned encountered_task_types;
-  struct hashmap work_pointer_to_fuse_task_map;
-  struct wstream_fused_macro_task_loop *fused_tasks;
+  // unsigned encountered_task_types;
+  size_t sizeof_task_type_infos;
+  struct wstream_task_type_fuse_info *task_type_infos;
 #endif
 
   void* current_work_fn;

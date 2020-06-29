@@ -24,7 +24,6 @@
 #include "reuse.h"
 #include "prng.h"
 #include "hwloc-support.h"
-#include "hashmap.h"
 #include "task_fusion.h"
 
 #ifdef DEPENDENCE_AWARE_ALLOC
@@ -421,17 +420,35 @@ tdecrease_n (void *data, size_t n, bool is_write)
 #if WSTREAM_FUSE_MACRO_TASK_LOOP
 
         // Getting the info data structure for this task type
-        struct wstream_task_type_fuse_info *fuse_info =
-            fused_tl_hashmap_get(&cthread->work_pointer_to_fuse_task_map, &fp->work_fn);
+        struct wstream_task_type_fuse_info *fuse_info = NULL;
+        for (size_t i = 0; i < cthread->sizeof_task_type_infos; ++i) {
+          if(fp->work_fn == cthread->task_type_infos[i].task_work_fn) {
+            fuse_info = &cthread->task_type_infos[i];
+          }
+        }
         if (!fuse_info) {
-          // first encounter in this worker
-          fuse_info = alloc_task_type_fuse_info(fp->work_fn);
-          fused_tl_hashmap_put(&cthread->work_pointer_to_fuse_task_map, &fp->work_fn, fuse_info);
+          void *more_infos = slab_alloc(cthread, cthread->slab_cache, (cthread->sizeof_task_type_infos + 1) * sizeof(*cthread->task_type_infos));
+          if (cthread->task_type_infos != NULL) {
+            memcpy(more_infos, cthread->task_type_infos, cthread->sizeof_task_type_infos * sizeof(*cthread->task_type_infos));
+            slab_free(cthread->slab_cache, cthread->task_type_infos);
+          }
+          cthread->task_type_infos = more_infos;
+          fuse_info = &cthread->task_type_infos[cthread->sizeof_task_type_infos];
+          cthread->sizeof_task_type_infos++;
+
+          fuse_info->task_work_fn = fp->work_fn;
+          fuse_info->best_amount_to_fuse = num_default_fuse_task;
+          fuse_info->fused_frames.max_tasks_to_fuse = fuse_info->best_amount_to_fuse;
+          fuse_info->fused_frames.task_frames = slab_alloc(
+              cthread, cthread->slab_cache,
+              fuse_info->fused_frames.max_tasks_to_fuse * sizeof(*fuse_info->fused_frames.task_frames));
+          fuse_info->fused_frames.num_tasks_fused = 0;
         }
 
         // Naive approach of always adding a ready task to a macro task
         struct wstream_fused_macro_task_loop *fused_frames = &fuse_info->fused_frames;
         fused_frames->task_frames[fused_frames->num_tasks_fused++] = fp;
+        assert(fused_frames->num_tasks_fused <= fused_frames->max_tasks_to_fuse);
 
         // Macro task full and ready to schedule
         if (fused_frames->num_tasks_fused == fused_frames->max_tasks_to_fuse) {
@@ -1355,7 +1372,8 @@ void pre_main()
 #endif
 
 #if WSTREAM_FUSE_MACRO_TASK_LOOP
-  hashmap_init(&current_thread->work_pointer_to_fuse_task_map, hashmap_hash_pointer, hashmap_compare_pointer, 0);
+  current_thread->task_type_infos = NULL;
+  current_thread->sizeof_task_type_infos = 0;
 #endif
 
     wstream_df_worker_threads[0]->current_work_fn = (void *)main;

@@ -3,9 +3,7 @@
 
 #if WSTREAM_FUSE_TASKS
 
-#include "hashmap.h"
-
-#define num_default_fuse_task 1
+#define num_default_fuse_task 5
 
 typedef void (*workfn_ptr_type)(void *);
 
@@ -30,8 +28,6 @@ wstream_fused_macro_task_loop_location_in_frame(void *frame_ptr);
 struct wstream_task_type_fuse_info *alloc_task_type_fuse_info(workfn_ptr_type task_work_fn);
 
 struct wstream_df_frame **alloc_task_frame_array(unsigned size_array);
-
-HASHMAP_FUNCS_DECLARE(fused_tl, workfn_ptr_type, struct wstream_task_type_fuse_info)
 
 #endif // WSTREAM_FUSE_TASKS
 #endif // TASK_FUSION_H__

@@ -763,9 +763,8 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
   if (fp == NULL) {
     // If no work yet, run the macro task having the most fused tasks
     struct wstream_task_type_fuse_info *best_macro_task = NULL;
-    for (struct hashmap_iter *iter = hashmap_iter(&cthread->work_pointer_to_fuse_task_map); iter;
-         iter = hashmap_iter_next(&cthread->work_pointer_to_fuse_task_map, iter)) {
-      struct wstream_task_type_fuse_info *fuse_info = fused_tl_hashmap_iter_get_data(iter);
+    for (size_t i = 0; i < cthread->sizeof_task_type_infos; ++i) {
+      struct wstream_task_type_fuse_info *fuse_info = &cthread->task_type_infos[i];
       if (best_macro_task == NULL) {
         if (fuse_info->fused_frames.num_tasks_fused > 0) {
           best_macro_task = fuse_info;

@@ -13,7 +13,7 @@ extern __thread wstream_df_thread_p current_thread;
 static void exec_macro_task_loop(void *task_frame_ptr) {
   struct wstream_fused_macro_task_loop *fused =
       wstream_fused_macro_task_loop_location_in_frame(task_frame_ptr);
-  fprintf(stderr, "Executing fused task with %u fused tasks\n", fused->num_tasks_fused);
+  // fprintf(stderr, "Executing fused task with %u fused tasks\n", fused->num_tasks_fused);
   for (unsigned i = 0; i < fused->num_tasks_fused; ++i) {
     wstream_df_frame_p fp = (wstream_df_frame_p)fused->task_frames[i];
     exec_work_frame(fp);
@@ -61,7 +61,5 @@ struct wstream_df_frame **alloc_task_frame_array(unsigned size_array) {
   return slab_alloc(current_thread, current_thread->slab_cache,
                     size_array * sizeof(struct wstream_df_frame *));
 }
-
-HASHMAP_FUNCS_CREATE(fused_tl, workfn_ptr_type, struct wstream_task_type_fuse_info)
 
 #endif // def WSTREAM_FUSE_TASKS
