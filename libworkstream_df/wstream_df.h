@@ -16,6 +16,11 @@
 #include "runtime_tasks_info.h"
 #include "task_fusion.h"
 
+#if WSTREAM_FUSE_TASKS
+  #include "khash.h"
+  KHASH_DECLARE(taskTypeToInfo,void*,struct wstream_task_type_fuse_info*)
+#endif
+
 #if ALLOW_PUSHES
 #define FIFO_SIZE NUM_PUSH_SLOTS
 #include "mpsc_fifo.h"
@@ -236,6 +241,7 @@ typedef struct __attribute__ ((aligned (64))) wstream_df_thread
   // unsigned encountered_task_types;
   size_t sizeof_task_type_infos;
   struct wstream_task_type_fuse_info *task_type_infos;
+  khash_t(taskTypeToInfo) *task_type_info;
 #endif
 
   void* current_work_fn;

@@ -5,6 +5,7 @@
 #include "task_fusion.h"
 #include "numa.h"
 #include "wstream_df.h"
+#include "khash.h"
 
 #ifdef WSTREAM_FUSE_TASKS
 
@@ -13,7 +14,7 @@ extern __thread wstream_df_thread_p current_thread;
 static void exec_macro_task_loop(void *task_frame_ptr) {
   struct wstream_fused_macro_task_loop *fused =
       wstream_fused_macro_task_loop_location_in_frame(task_frame_ptr);
-  // fprintf(stderr, "Executing fused task with %u fused tasks\n", fused->num_tasks_fused);
+  fprintf(stderr, "Executing fused task with %u fused tasks\n", fused->num_tasks_fused);
   for (unsigned i = 0; i < fused->num_tasks_fused; ++i) {
     wstream_df_frame_p fp = (wstream_df_frame_p)fused->task_frames[i];
     exec_work_frame(fp);
@@ -53,7 +54,7 @@ struct wstream_task_type_fuse_info *alloc_task_type_fuse_info(workfn_ptr_type ta
   new_fuse_info->encountered_times = 0;
   new_fuse_info->fused_frames.max_tasks_to_fuse = num_default_fuse_task;
   new_fuse_info->fused_frames.num_tasks_fused = 0;
-  new_fuse_info->fused_frames.task_frames = alloc_task_frame_array(num_default_fuse_task);
+  new_fuse_info->fused_frames.task_frames = alloc_task_frame_array(new_fuse_info->best_amount_to_fuse);
   return new_fuse_info;
 }
 
