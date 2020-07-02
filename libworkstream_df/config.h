@@ -65,6 +65,26 @@
 #define USE_BROADCAST_TABLES 0
 
 /*
+ * Gather runtime information for each task type. The information is stored as
+ * a map from 'task work pointer' to a "struct task_type_info" defined in the
+ * file runtime_tasks_info.h.
+ *
+ * The gathered informations are:
+ *   - A sliding window of 'TASK_INFO_SLIDING_WIN_SIZE' task execution times
+ *   - The mean execution time for the window
+ *   - The number of instance of this task type that have been executed
+ *
+ * The option TASK_INFO_USE_HASHTABLE selects between a hash table or an array
+ * with linear search to implement the map.
+ */
+
+#define RUNTIME_TASKS_INFO 0
+
+#define TASK_INFO_SLIDING_WIN_SIZE 16
+
+#define TASK_INFO_USE_HASHTABLE 1
+
+/*
  * How should the workers be places when OMP_NUM_THREADS specifies a lower
  * amount of worker than what is available on the system. You can select
  * between the following options:
