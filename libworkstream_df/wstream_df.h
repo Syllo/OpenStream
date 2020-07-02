@@ -13,6 +13,7 @@
 #include "list.h"
 #include "profiling.h"
 #include "broadcast.h"
+#include "runtime_tasks_info.h"
 
 #if ALLOW_PUSHES
 #define FIFO_SIZE NUM_PUSH_SLOTS
@@ -221,6 +222,10 @@ typedef struct __attribute__ ((aligned (64))) wstream_df_thread
   int64_t tsc_offset;
   int tsc_offset_init;
   int yield;
+
+#if RUNTIME_TASKS_INFO
+  map_tasktype_to_info_p runtime_tasks_info;
+#endif
 
 #if CACHE_LAST_STEAL_VICTIM
   hwloc_obj_t last_steal_from;

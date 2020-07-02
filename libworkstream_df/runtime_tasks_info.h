@@ -82,4 +82,6 @@ map_tasktype_to_info_p alloc_tti_map();
 struct task_type_info *create_maping_for_function(map_tasktype_to_info_p map,
                                                   work_fn_p fn);
 
+void free_tti_map(map_tasktype_to_info_p map);
+
 #endif // RUNTIME_TASKS_INFO_H

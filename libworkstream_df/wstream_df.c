@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdalign.h>
 #include <stdint.h>
+#include <time.h>
 
 
 #include "config.h"
@@ -872,6 +873,19 @@ wstream_df_resolve_dependences (void *v, void *s, bool is_read_view_p)
   trace_state_restore(current_thread);
 }
 
+__attribute__((const)) static inline float
+timespec_difftime(struct timespec t0, struct timespec t1) {
+  float secdiff = t1.tv_sec - t0.tv_sec;
+  if (t1.tv_nsec < t0.tv_nsec) {
+    long val = 1000000000l - t0.tv_nsec + t1.tv_nsec;
+    secdiff += (double)val / 1e9 - 1.;
+  } else {
+    long val = t1.tv_nsec - t0.tv_nsec;
+    secdiff += (double)val / 1e9;
+  }
+  return secdiff;
+}
+
 /***************************************************************************/
 /* Threads and scheduling.  */
 /***************************************************************************/
@@ -934,7 +948,19 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
       update_papi(cthread);
       trace_runtime_counters(cthread);
 
+#if RUNTIME_TASKS_INFO
+      struct timespec start_time;
+      int time_retval = clock_gettime(CLOCK_MONOTONIC, &start_time);
+      assert(time_retval == 0);
+#endif
+
       fp->work_fn(fp);
+
+#if RUNTIME_TASKS_INFO
+      struct timespec end_time;
+      time_retval = clock_gettime(CLOCK_MONOTONIC, &end_time);
+      assert(time_retval == 0);
+#endif
 
       wqueue_counters_profile_rusage(cthread);
       trace_runtime_counters(cthread);
@@ -965,6 +991,22 @@ __attribute__((__optimize__("O1"))) static void worker_thread(void) {
       }
       __compiler_fence;
 
+#if RUNTIME_TASKS_INFO
+      struct task_type_info *info =
+          get_tti_from_work_fn(current_thread->runtime_tasks_info, fp->work_fn);
+      if (unlikely(!info)) {
+        info = create_maping_for_function(current_thread->runtime_tasks_info,
+                                          fp->work_fn);
+      }
+      float time = timespec_difftime(start_time, end_time);
+      task_info_add_exec_time(info, time);
+      info->instances_executed++;
+      fprintf(stderr,
+              "Task %p instance %lu finished in %fs, average %fs\n",
+              fp->work_fn, info->instances_executed, time,
+              task_info_avg_exec_time(info));
+#endif
+
       trace_task_exec_end(cthread, fp);
       cthread->current_work_fn = NULL;
       cthread->current_frame = NULL;
@@ -991,6 +1033,10 @@ wstream_df_worker_thread_fn (void *data)
     trace_init(cthread);
 
   init_wqueue_counters (cthread);
+
+#if RUNTIME_TASKS_INFO
+  current_thread->runtime_tasks_info = alloc_tti_map();
+#endif
 
   worker_thread ();
   return NULL;
@@ -1267,6 +1313,9 @@ void pre_main()
                    num_cpu_affinities, wstream_df_worker_thread_fn);
 
     init_wqueue_counters(wstream_df_worker_threads[0]);
+#if RUNTIME_TASKS_INFO
+    current_thread->runtime_tasks_info = alloc_tti_map();
+#endif
 
     wstream_df_worker_threads[0]->current_work_fn = (void *)main;
     wstream_df_worker_threads[0]->current_frame = NULL;

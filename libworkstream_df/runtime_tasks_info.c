@@ -68,6 +68,10 @@ struct task_type_info *create_maping_for_function(map_tasktype_to_info_p map,
   return tti;
 }
 
+void free_tti_map(map_tasktype_to_info_p map) {
+  kh_destroy_mapTaskTypeToInfo(map);
+}
+
 #else
 
 #define map_size_increment 16
@@ -93,6 +97,11 @@ struct task_type_info *create_maping_for_function(map_tasktype_to_info_p map,
   init_task_info_for_ptr(fn, &map->task_type_array[map->amount_in_map]);
   map->amount_in_map++;
   return &map->task_type_array[map->amount_in_map];
+}
+
+void free_tti_map(map_tasktype_to_info_p map) {
+  slab_free(current_thread->slab_cache, map->task_type_array);
+  slab_free(current_thread->slab_cache, map);
 }
 
 #undef increment_size_increase
