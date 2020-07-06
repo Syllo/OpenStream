@@ -88,7 +88,7 @@
  * with linear search to implement the map.
  */
 
-#define RUNTIME_TASKS_INFO 0
+#define RUNTIME_TASKS_INFO 1
 
 #define TASK_INFO_SLIDING_WIN_SIZE 16
 
@@ -342,6 +342,10 @@
 
 #if TRACE_QUEUE_STATS && !WQUEUE_PROFILE
 #error "TRACE_QUEUE_STATS defined, but WQUEUE_PROFILE != 1"
+#endif
+
+#if WSTREAM_FUSE_TASKS && !RUNTIME_TASKS_INFO
+#error "Task fusion option (WSTREAM_FUSE_TASKS) requires runtime task info (RUNTIME_TASKS_INFO)"
 #endif
 
 #if (WS_PAPI_PROFILE || TRACE_COMMUNICATION || \

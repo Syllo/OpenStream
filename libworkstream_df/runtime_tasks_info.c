@@ -65,6 +65,7 @@ struct task_type_info *create_maping_for_function(map_tasktype_to_info_p map,
   assert(retVal != 0 && retVal != -1); // Do not insert twice the same key
   struct task_type_info *tti = &kh_value(map, index);
   init_task_info_for_ptr(fn, tti);
+  WSTREAM_FUSE_TASKS_INIT_FIELDS(&tti->fuse_info);
   return tti;
 }
 

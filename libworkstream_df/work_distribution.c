@@ -749,13 +749,13 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
 #if WSTREAM_FUSE_MACRO_TASK_LOOP
   if (fp == NULL) {
     // If no work yet, run the macro task having the most fused tasks
-    struct wstream_task_type_fuse_info *best_macro_task = NULL;
-    for (khint_t i = kh_begin(cthread->task_type_info); i != kh_end(cthread->task_type_info); ++i) {
-      if (!kh_exist(cthread->task_type_info, i))
+    struct task_fuse_info *best_macro_task = NULL;
+    for (khint_t i = kh_begin(cthread->runtime_tasks_info);
+         i != kh_end(cthread->runtime_tasks_info); ++i) {
+      if (!kh_exist(cthread->runtime_tasks_info, i))
         continue;
-      // for (size_t i = 0; i < cthread->sizeof_task_type_infos; ++i) {
-      // struct wstream_task_type_fuse_info *fuse_info = &cthread->task_type_infos[i];
-      struct wstream_task_type_fuse_info *fuse_info = kh_value(cthread->task_type_info, i);
+      struct task_type_info *info = &kh_value(cthread->runtime_tasks_info, i);
+      struct task_fuse_info *fuse_info = &info->fuse_info;
       if (best_macro_task == NULL) {
         if (fuse_info->fused_frames.num_tasks_fused > 0) {
           best_macro_task = fuse_info;
@@ -763,7 +763,8 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
       } else {
         if (fuse_info->fused_frames.num_tasks_fused >
             best_macro_task->fused_frames
-                .num_tasks_fused) { // For now take the first fused task and be happy with it
+                .num_tasks_fused) { // For now take the first fused task and be
+                                    // happy with it
           best_macro_task = fuse_info;
         }
       }
@@ -773,10 +774,7 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
       struct wstream_fused_macro_task_loop *fused_frame_data =
           wstream_fused_macro_task_loop_location_in_frame(fused_task_frame);
       *fused_frame_data = best_macro_task->fused_frames;
-      best_macro_task->fused_frames.task_frames =
-          alloc_task_frame_array(best_macro_task->best_amount_to_fuse);
-      best_macro_task->fused_frames.num_tasks_fused = 0;
-      best_macro_task->fused_frames.max_tasks_to_fuse = best_macro_task->best_amount_to_fuse;
+      best_macro_task->fused_frames.task_frames = NULL;
       fp = fused_task_frame;
     }
   }

@@ -2,6 +2,7 @@
 #define RUNTIME_TASKS_INFO_H
 
 #include "config.h"
+#include "task_fusion.h"
 
 #if TASK_INFO_USE_HASHTABLE
 #include "khash.h"
@@ -9,6 +10,7 @@
 
 #include <assert.h>
 #include <stdint.h>
+
 
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
@@ -21,6 +23,7 @@ struct task_type_info {
   unsigned sliding_win_start, sliding_win_end;
   double task_runtime_sliding_window[TASK_INFO_SLIDING_WIN_SIZE];
   float sum_exec_time;
+  WSTREAM_FUSE_TASKS_FIELDS
 };
 
 void init_task_info_for_ptr(work_fn_p ptr, struct task_type_info *tti);
