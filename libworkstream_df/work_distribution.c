@@ -757,11 +757,11 @@ wstream_df_frame_p obtain_work(wstream_df_thread_p cthread,
       struct task_type_info *info = &kh_value(cthread->runtime_tasks_info, i);
       struct task_fuse_info *fuse_info = &info->fuse_info;
       if (best_macro_task == NULL) {
-        if (fuse_info->fused_frames.num_tasks_fused > 0) {
+        if (fuse_info->fused_frames.task_frames && fuse_info->fused_frames.num_tasks_fused > 0) {
           best_macro_task = fuse_info;
         }
       } else {
-        if (fuse_info->fused_frames.num_tasks_fused >
+        if (fuse_info->fused_frames.task_frames && fuse_info->fused_frames.num_tasks_fused >
             best_macro_task->fused_frames
                 .num_tasks_fused) { // For now take the first fused task and be
                                     // happy with it
